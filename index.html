@@ -327,7 +327,7 @@ function deDB(row) {
 
 async function cargarDesdeSupabase() {
     try {
-        const res = await fetch(`${SB_URL}/rest/v1/Activos?select=*&order=id`, {
+        const res = await fetch(`${SB_URL}/rest/v1/activos?select=*&order=id`, {
             headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
         });
         if (!res.ok) throw new Error('Error al cargar');
@@ -344,7 +344,7 @@ async function guardarEnSupabase() {
     mostrarEstado('💾 Guardando...', 'neutral');
     try {
         // Paso 1: borrar todos los registros (filtro por nombre no nulo)
-        const delRes = await fetch(`${SB_URL}/rest/v1/Activos?nombre=not.is.null`, {
+        const delRes = await fetch(`${SB_URL}/rest/v1/activos?nombre=not.is.null`, {
             method: 'DELETE', headers: SB_HEADERS
         });
         if (!delRes.ok) {
@@ -353,7 +353,7 @@ async function guardarEnSupabase() {
         }
 
         // Paso 2: insertar los activos actuales
-        const insRes = await fetch(`${SB_URL}/rest/v1/Activos`, {
+        const insRes = await fetch(`${SB_URL}/rest/v1/activos`, {
             method: 'POST',
             headers: SB_HEADERS,
             body: JSON.stringify(activos.map(aDB))
