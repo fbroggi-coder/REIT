@@ -286,6 +286,81 @@
 
 <script>
 // ================================================================
+// SUPABASE
+// ================================================================
+const SB_URL = 'https://xyoxonwufbrorwsoyyce.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh5b3hvbnd1ZmJyb3J3c295eWNlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3MjA4OTUsImV4cCI6MjA5NzI5Njg5NX0.b7uBEOnBMK9VjD_AuRaiNSv1IOh2_gVO72ybk9OL5KM';
+const SB_HEADERS = {
+    'apikey': SB_KEY,
+    'Authorization': `Bearer ${SB_KEY}`,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=minimal'
+};
+
+// JS camelCase → columnas de la BD
+function aDB(a) {
+    return {
+        seccion:        a.seccion,
+        nombre:         a.nombre,
+        moneda:         a.moneda,
+        tipo:           a.tipo,
+        nominales:      a.nominales,
+        precio_inicial: a.precioInicial,
+        precio_ayer:    a.precioAyer,
+        precio_actual:  a.precioActual
+    };
+}
+
+// Columnas de la BD → JS camelCase
+function deDB(row) {
+    return {
+        seccion:       row.seccion,
+        nombre:        row.nombre,
+        moneda:        row.moneda,
+        tipo:          row.tipo,
+        nominales:     row.nominales,
+        precioInicial: row.precio_inicial,
+        precioAyer:    row.precio_ayer,
+        precioActual:  row.precio_actual
+    };
+}
+
+async function cargarDesdeSupabase() {
+    try {
+        const res = await fetch(`${SB_URL}/rest/v1/activos?select=*&order=id`, {
+            headers: { 'apikey': SB_KEY, 'Authorization': `Bearer ${SB_KEY}` }
+        });
+        if (!res.ok) throw new Error('Error al cargar');
+        const rows = await res.json();
+        if (rows.length > 0) activos = rows.map(deDB);
+    } catch(e) {
+        console.warn('Supabase no disponible, usando datos locales:', e);
+        const local = localStorage.getItem('cartera_activos');
+        if (local) activos = JSON.parse(local);
+    }
+}
+
+async function guardarEnSupabase() {
+    try {
+        // Borrar todos los registros existentes
+        await fetch(`${SB_URL}/rest/v1/activos?id=gte.0`, {
+            method: 'DELETE', headers: SB_HEADERS
+        });
+        // Insertar los activos actuales
+        await fetch(`${SB_URL}/rest/v1/activos`, {
+            method: 'POST',
+            headers: SB_HEADERS,
+            body: JSON.stringify(activos.map(aDB))
+        });
+        // Cache local como respaldo
+        localStorage.setItem('cartera_activos', JSON.stringify(activos));
+    } catch(e) {
+        console.warn('Error guardando en Supabase, guardando localmente:', e);
+        localStorage.setItem('cartera_activos', JSON.stringify(activos));
+    }
+}
+
+// ================================================================
 // DATOS
 // ================================================================
 const CUOTAPARTES = 66327251;
@@ -551,7 +626,7 @@ function guardarCambios() {
     if (hayError) { alert('Completá el nombre de todos los activos.'); return; }
 
     activos = nuevos;
-    guardarEnLocal();
+    guardarEnSupabase();
     renderTabla();
     cerrarModal();
 }
@@ -704,7 +779,7 @@ async function actualizarPrecios() {
             }
         });
 
-        guardarEnLocal();
+        guardarEnSupabase();
         renderTabla();
 
         const msg = noEncontrados.length
@@ -722,26 +797,17 @@ async function actualizarPrecios() {
 }
 
 // ================================================================
-// PERSISTENCIA LOCAL
-// ================================================================
-function guardarEnLocal() {
-    localStorage.setItem('cartera_activos', JSON.stringify(activos));
-}
-
-function cargarDesdeLocal() {
-    const guardado = localStorage.getItem('cartera_activos');
-    if (guardado) {
-        try {
-            activos = JSON.parse(guardado);
-        } catch(e) { /* datos corruptos, usar defaults */ }
-    }
-}
-
-// ================================================================
 // INICIAR
 // ================================================================
-cargarDesdeLocal();
-renderTabla();
+async function init() {
+    document.getElementById('btnApi').textContent = '⏳ Cargando...';
+    document.getElementById('btnApi').disabled = true;
+    await cargarDesdeSupabase();
+    renderTabla();
+    document.getElementById('btnApi').textContent = '🔄 Actualizar precios';
+    document.getElementById('btnApi').disabled = false;
+}
+init();
 </script>
 
 </body>
