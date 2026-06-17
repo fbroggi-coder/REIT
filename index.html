@@ -3,12 +3,626 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cartera del Fondo</title>
+    <title>Dashboard - Cartera del Fondo</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f1117;
+            color: #e1e4e8;
+            padding: 24px;
+            min-height: 100vh;
+        }
+
+        header { margin-bottom: 24px; }
+        header h1 { font-size: 22px; color: #58a6ff; font-weight: 700; margin-bottom: 4px; }
+        header p  { font-size: 12px; color: #8b949e; }
+
+        /* ── Tarjetas ── */
+        .cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 14px;
+            margin-bottom: 24px;
+        }
+        .card { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 18px 20px; }
+        .card-label { font-size: 11px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 8px; }
+        .card-value { font-size: 20px; font-weight: 700; margin-bottom: 4px; }
+        .card-sub   { font-size: 11px; color: #8b949e; }
+
+        .positive { color: #3fb950; }
+        .negative { color: #f85149; }
+        .neutral  { color: #e1e4e8; }
+
+        /* ── Tabla principal ── */
+        .table-wrapper { background: #161b22; border: 1px solid #30363d; border-radius: 10px; overflow: hidden; }
+        .table-toolbar {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 14px 20px; border-bottom: 1px solid #30363d; gap: 10px; flex-wrap: wrap;
+        }
+        .table-toolbar h2 { font-size: 14px; font-weight: 600; }
+        .toolbar-btns { display: flex; gap: 8px; }
+
+        .btn {
+            border: none; padding: 7px 14px; border-radius: 6px; font-size: 12px;
+            cursor: pointer; transition: background 0.15s; font-weight: 500;
+        }
+        .btn-green  { background: #238636; color: #fff; }
+        .btn-green:hover  { background: #2ea043; }
+        .btn-blue   { background: #1f4d7a; color: #79c0ff; }
+        .btn-blue:hover   { background: #2d6da4; }
+        .btn-ghost  { background: transparent; color: #8b949e; border: 1px solid #30363d; }
+        .btn-ghost:hover  { background: #21262d; color: #e1e4e8; }
+        .btn-danger { background: #6e2020; color: #f85149; border: none; }
+        .btn-danger:hover { background: #8f2a2a; }
+
+        .scroll-x { overflow-x: auto; }
+
+        table { width: 100%; border-collapse: collapse; font-size: 12.5px; white-space: nowrap; }
+        thead th {
+            background: #0d1117; color: #8b949e; font-weight: 600; font-size: 10.5px;
+            text-transform: uppercase; letter-spacing: 0.5px; padding: 10px 14px;
+            text-align: right; border-bottom: 1px solid #30363d;
+        }
+        thead th:first-child { text-align: left; }
+        th.editable { color: #58a6ff; }
+
+        tbody td { padding: 9px 14px; border-bottom: 1px solid #21262d; text-align: right; }
+        tbody td:first-child { text-align: left; font-weight: 600; }
+        tbody tr:last-child td { border-bottom: none; }
+        tbody tr:hover { background: #1c2128; }
+
+        tr.section-header td {
+            background: #0d1117; color: #8b949e; font-style: italic;
+            font-size: 10.5px; padding: 6px 14px; border-bottom: 1px solid #30363d;
+        }
+
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+        .badge-USD     { background: #1f4d7a; color: #79c0ff; }
+        .badge-Pesos   { background: #1a3a2a; color: #3fb950; }
+        .badge-Dolares { background: #2d2a1f; color: #e3b341; }
+
+        .price-input {
+            background: #0d1117; border: 1px solid #30363d; color: #e1e4e8;
+            padding: 4px 8px; border-radius: 5px; width: 100px; text-align: right;
+            font-size: 12.5px; transition: border-color 0.15s;
+        }
+        .price-input:focus { outline: none; border-color: #58a6ff; }
+
+        footer { margin-top: 14px; text-align: center; font-size: 11px; color: #3d444d; }
+
+        /* ══════════════════════════════════════
+           MODAL DE EDICIÓN
+        ══════════════════════════════════════ */
+        .modal-overlay {
+            display: none;
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.75);
+            z-index: 100;
+            justify-content: center;
+            align-items: flex-start;
+            padding: 30px 16px;
+            overflow-y: auto;
+        }
+        .modal-overlay.active { display: flex; }
+
+        .modal {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 1100px;
+            padding: 24px;
+            margin: auto;
+        }
+        .modal-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 18px;
+        }
+        .modal-header h2 { font-size: 16px; color: #e1e4e8; }
+        .modal-close { background: none; border: none; color: #8b949e; font-size: 22px; cursor: pointer; line-height: 1; }
+        .modal-close:hover { color: #e1e4e8; }
+
+        .modal-actions {
+            display: flex; gap: 8px; flex-wrap: wrap;
+            margin-bottom: 16px; padding-bottom: 16px;
+            border-bottom: 1px solid #30363d;
+        }
+        .modal-note { font-size: 11px; color: #8b949e; margin-bottom: 12px; }
+
+        /* Tabla de edición dentro del modal */
+        .edit-scroll { overflow-x: auto; margin-bottom: 16px; }
+
+        #editTable { width: 100%; border-collapse: collapse; font-size: 12.5px; white-space: nowrap; }
+        #editTable th {
+            background: #0d1117; color: #8b949e; font-size: 10.5px; text-transform: uppercase;
+            letter-spacing: 0.4px; padding: 8px 10px; text-align: left;
+            border-bottom: 1px solid #30363d;
+        }
+        #editTable td { padding: 6px 6px; border-bottom: 1px solid #21262d; vertical-align: middle; }
+        #editTable tr:hover td { background: #1c2128; }
+
+        .edit-input {
+            background: #0d1117; border: 1px solid #30363d; color: #e1e4e8;
+            padding: 5px 8px; border-radius: 5px; font-size: 12px; width: 100%;
+            transition: border-color 0.15s;
+        }
+        .edit-input:focus { outline: none; border-color: #58a6ff; }
+        select.edit-input { cursor: pointer; }
+
+        .modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+
+        /* Aviso de importación */
+        #csvStatus {
+            font-size: 12px; padding: 8px 12px; border-radius: 6px;
+            display: none; margin-top: 8px;
+        }
+        #csvStatus.ok    { background: #1a3a2a; color: #3fb950; display: block; }
+        #csvStatus.error { background: #3a1a1a; color: #f85149; display: block; }
+    </style>
 </head>
 <body>
 
-    <h1>Dashboard - Cartera del Fondo</h1>
-    <p>Bienvenido al sistema de seguimiento de inversiones.</p>
+<header>
+    <h1>📊 Dashboard — Cartera del Fondo</h1>
+    <p>Última actualización: <span id="updateTime">—</span></p>
+</header>
+
+<!-- ── Tarjetas ── -->
+<div class="cards">
+    <div class="card">
+        <div class="card-label">Valor Total de la Cartera</div>
+        <div class="card-value neutral" id="totalCartera">—</div>
+        <div class="card-sub">En pesos argentinos</div>
+    </div>
+    <div class="card">
+        <div class="card-label">NAV</div>
+        <div class="card-value neutral" id="nav">—</div>
+        <div class="card-sub">66.327.251 cuotapartes</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Variación desde Inicio</div>
+        <div class="card-value" id="varInicio">—</div>
+        <div class="card-sub">NAV / $ 1.000 − 1</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Variación del Día — Cartera</div>
+        <div class="card-value" id="varCarteraPct">—</div>
+        <div class="card-sub" id="varCarteraPesos">vs. valorizada ayer</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Variación del Día — NAV</div>
+        <div class="card-value" id="varNavPct">—</div>
+        <div class="card-sub" id="varNavPesos">vs. valorizada ayer</div>
+    </div>
+</div>
+
+<!-- ── Tabla principal ── -->
+<div class="table-wrapper">
+    <div class="table-toolbar">
+        <h2>Composición de la Cartera</h2>
+        <div class="toolbar-btns">
+            <button class="btn btn-blue" onclick="abrirModal()">✏️ Modificar Cartera</button>
+            <button class="btn btn-green" onclick="recalcular()">↻ Recalcular</button>
+        </div>
+    </div>
+    <div class="scroll-x">
+        <table>
+            <thead>
+                <tr>
+                    <th>Activo</th>
+                    <th>Moneda</th>
+                    <th>Nominales</th>
+                    <th>Precio Inicial</th>
+                    <th class="editable">Precio Ayer ✎</th>
+                    <th class="editable">Precio Actual ✎</th>
+                    <th>Monto ARS</th>
+                    <th>Var. Día $</th>
+                    <th>Var. Día %</th>
+                    <th>Var. Inicio %</th>
+                    <th>% Cartera</th>
+                </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<footer>
+    Columnas ✎ editables directamente. Para cambios estructurales usá <strong>Modificar Cartera</strong>.
+</footer>
+
+<!-- ══════════════════════════════════════
+     MODAL DE EDICIÓN
+══════════════════════════════════════ -->
+<div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+        <div class="modal-header">
+            <h2>✏️ Modificar Cartera</h2>
+            <button class="modal-close" onclick="cerrarModal()">✕</button>
+        </div>
+
+        <div class="modal-actions">
+            <button class="btn btn-green" onclick="agregarFila()">+ Agregar activo</button>
+            <button class="btn btn-ghost" onclick="descargarCSV()">⬇ Descargar plantilla CSV</button>
+            <label class="btn btn-ghost" style="cursor:pointer;">
+                ⬆ Importar CSV
+                <input type="file" id="csvInput" accept=".csv" style="display:none" onchange="importarCSV(event)">
+            </label>
+        </div>
+
+        <p class="modal-note">
+            Podés editar directamente en la tabla, agregar o eliminar filas, o importar un CSV con el mismo formato de la plantilla.
+        </p>
+        <div id="csvStatus"></div>
+
+        <div class="edit-scroll">
+            <table id="editTable">
+                <thead>
+                    <tr>
+                        <th style="width:140px">Sección</th>
+                        <th style="width:100px">Activo</th>
+                        <th style="width:90px">Moneda</th>
+                        <th style="width:80px">Tipo</th>
+                        <th style="width:150px">Nominales</th>
+                        <th style="width:120px">Precio Inicial</th>
+                        <th style="width:120px">Precio Ayer</th>
+                        <th style="width:120px">Precio Actual</th>
+                        <th style="width:40px"></th>
+                    </tr>
+                </thead>
+                <tbody id="editBody"></tbody>
+            </table>
+        </div>
+
+        <div class="modal-footer">
+            <button class="btn btn-ghost" onclick="cerrarModal()">Cancelar</button>
+            <button class="btn btn-green" onclick="guardarCambios()">✔ Guardar cambios</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ================================================================
+// DATOS
+// ================================================================
+const CUOTAPARTES = 66327251;
+const NAV_INICIAL = 1000;
+
+const SECCIONES = ['Bonos USD', 'Bonos en Pesos', 'Money Market', 'Disponibilidades y Honorarios'];
+const MONEDAS   = ['USD', 'Pesos', 'Dólares'];
+
+// Modelo plano: cada activo tiene su sección como campo
+let activos = [
+    { seccion: 'Bonos USD',    nombre: 'AL30',  moneda: 'USD',     nominales: 11500000,     tipo: 'bono',     precioInicial: 93527,     precioAyer: 93527,     precioActual: 94070    },
+    { seccion: 'Bonos USD',    nombre: 'AO28',  moneda: 'USD',     nominales: 3000000,      tipo: 'bono',     precioInicial: 139970,    precioAyer: 139970,    precioActual: 141400   },
+    { seccion: 'Bonos USD',    nombre: 'AO27',  moneda: 'USD',     nominales: 10700290,     tipo: 'bono',     precioInicial: 149115.29, precioAyer: 149115.29, precioActual: 150100   },
+    { seccion: 'Bonos en Pesos', nombre: 'M31G6', moneda: 'Pesos', nominales: 2350000000,   tipo: 'bono',     precioInicial: 123.65,    precioAyer: 123.65,    precioActual: 123.90   },
+    { seccion: 'Bonos en Pesos', nombre: 'T30A7', moneda: 'Pesos', nominales: 2000000000,   tipo: 'bono',     precioInicial: 128.25,    precioAyer: 128.25,    precioActual: 128.83   },
+    { seccion: 'Bonos en Pesos', nombre: 'TMG28', moneda: 'Pesos', nominales: 1500000000,   tipo: 'bono',     precioInicial: 102.90,    precioAyer: 102.90,    precioActual: 102.75   },
+    { seccion: 'Bonos en Pesos', nombre: 'TTJ26', moneda: 'Pesos', nominales: 2633811449,   tipo: 'bono',     precioInicial: 161.15,    precioAyer: 161.15,    precioActual: 161.20   },
+    { seccion: 'Bonos en Pesos', nombre: 'TTS26', moneda: 'Pesos', nominales: 2000000000,   tipo: 'bono',     precioInicial: 160.30,    precioAyer: 160.30,    precioActual: 160.60   },
+    { seccion: 'Bonos en Pesos', nombre: 'TXMD8', moneda: 'Pesos', nominales: 1000000000,   tipo: 'bono',     precioInicial: 89.75,     precioAyer: 89.75,     precioActual: 89.20    },
+    { seccion: 'Bonos en Pesos', nombre: 'TXMD9', moneda: 'Pesos', nominales: 1000000000,   tipo: 'bono',     precioInicial: 83.04,     precioAyer: 83.04,     precioActual: 83.00    },
+    { seccion: 'Bonos en Pesos', nombre: 'TXMJ0', moneda: 'Pesos', nominales: 1000000000,   tipo: 'bono',     precioInicial: 79.79,     precioAyer: 79.79,     precioActual: 79.25    },
+    { seccion: 'Money Market',  nombre: 'MM USD',      moneda: 'Dólares', nominales: 12100000,  tipo: 'efectivo', precioInicial: 1454, precioAyer: 1454,    precioActual: 1461.40 },
+    { seccion: 'Money Market',  nombre: 'MM en pesos', moneda: 'Pesos',   nominales: 150000000, tipo: 'efectivo', precioInicial: 1,    precioAyer: 1,       precioActual: 1       },
+    { seccion: 'Disponibilidades y Honorarios', nombre: 'Disponibilidades',         moneda: 'Pesos', nominales: 6961338.74,   tipo: 'efectivo', precioInicial: 1,  precioAyer: 1,  precioActual: 1  },
+    { seccion: 'Disponibilidades y Honorarios', nombre: 'Honorarios a pagar',       moneda: 'Pesos', nominales: 802559737.10, tipo: 'efectivo', precioInicial: 1,  precioAyer: 1,  precioActual: 1  },
+    { seccion: 'Disponibilidades y Honorarios', nombre: 'Honorarios Provisionados', moneda: 'Pesos', nominales: 259487770.48, tipo: 'efectivo', precioInicial: -1, precioAyer: -1, precioActual: -1 },
+    { seccion: 'Disponibilidades y Honorarios', nombre: 'Devengado Honorarios Hoy', moneda: 'Pesos', nominales: 40000000,     tipo: 'efectivo', precioInicial: -1, precioAyer: -1, precioActual: -1 },
+];
+
+// ================================================================
+// CÁLCULO
+// ================================================================
+function monto(a, campo) {
+    const p = a[campo];
+    return a.tipo === 'bono' ? a.nominales * p / 100 : a.nominales * p;
+}
+
+// ================================================================
+// FORMATO
+// ================================================================
+function fmtARS(n, dec = 0) {
+    return new Intl.NumberFormat('es-AR', { minimumFractionDigits: dec, maximumFractionDigits: dec }).format(n);
+}
+function fmtPct(n) { return (n >= 0 ? '+' : '') + n.toFixed(2) + '%'; }
+function fmtDelta(n) {
+    const abs = Math.abs(n), s = n >= 0 ? '+$ ' : '-$ ';
+    if (abs >= 1e9) return s + fmtARS(abs / 1e9, 2) + ' MM';
+    if (abs >= 1e6) return s + fmtARS(abs / 1e6, 2) + ' M';
+    return s + fmtARS(abs, 2);
+}
+function color(n) { return n > 0 ? 'positive' : n < 0 ? 'negative' : 'neutral'; }
+
+// ================================================================
+// RENDER TABLA PRINCIPAL
+// ================================================================
+function renderTabla() {
+    const tbody = document.getElementById('tableBody');
+    tbody.innerHTML = '';
+
+    // Agrupar por sección manteniendo el orden de primera aparición
+    const orden = [];
+    const grupos = {};
+    activos.forEach(a => {
+        if (!grupos[a.seccion]) { grupos[a.seccion] = []; orden.push(a.seccion); }
+        grupos[a.seccion].push(a);
+    });
+
+    orden.forEach(sec => {
+        // Fila de sección
+        const trSec = document.createElement('tr');
+        trSec.className = 'section-header';
+        trSec.innerHTML = `<td colspan="11">${sec}</td>`;
+        tbody.appendChild(trSec);
+
+        grupos[sec].forEach(activo => {
+            const mActual  = monto(activo, 'precioActual');
+            const mAyer    = monto(activo, 'precioAyer');
+            const mInicial = monto(activo, 'precioInicial');
+            const varDiaP  = mActual - mAyer;
+            const varDiaPct= mAyer    !== 0 ? (varDiaP / Math.abs(mAyer)) * 100 : 0;
+            const varInicioPct = activo.precioInicial !== 0
+                ? (activo.precioActual / activo.precioInicial - 1) * 100 : 0;
+
+            const globalIdx = activos.indexOf(activo);
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${activo.nombre}</td>
+                <td><span class="badge badge-${activo.moneda.replace(' ','')}">${activo.moneda}</span></td>
+                <td>${fmtARS(activo.nominales, 2)}</td>
+                <td>${fmtARS(activo.precioInicial, 2)}</td>
+                <td><input class="price-input" type="number" step="0.01" value="${activo.precioAyer}"
+                        onchange="actualizarCampo(${globalIdx},'precioAyer',this.value)"></td>
+                <td><input class="price-input" type="number" step="0.01" value="${activo.precioActual}"
+                        onchange="actualizarCampo(${globalIdx},'precioActual',this.value)"></td>
+                <td class="${color(mActual)}"    data-field="monto">${fmtARS(mActual, 0)}</td>
+                <td class="${color(varDiaP)}"    data-field="varP">${fmtDelta(varDiaP)}</td>
+                <td class="${color(varDiaPct)}"  data-field="varDiaPct">${fmtPct(varDiaPct)}</td>
+                <td class="${color(varInicioPct)}" data-field="varInicio">${fmtPct(varInicioPct)}</td>
+                <td data-field="pct">—</td>
+            `;
+            tbody.appendChild(tr);
+        });
+    });
+
+    recalcular();
+}
+
+// ================================================================
+// ACTUALIZAR CAMPO DESDE INPUT INLINE
+// ================================================================
+function actualizarCampo(idx, campo, valor) {
+    activos[idx][campo] = parseFloat(valor) || 0;
+    recalcular();
+}
+
+// ================================================================
+// RECALCULAR TOTALES
+// ================================================================
+function recalcular() {
+    let totalActual = 0, totalAyer = 0;
+    activos.forEach(a => { totalActual += monto(a,'precioActual'); totalAyer += monto(a,'precioAyer'); });
+
+    const nav          = totalActual / CUOTAPARTES;
+    const navAyer      = totalAyer   / CUOTAPARTES;
+    const varInicioPct = nav / NAV_INICIAL - 1;
+    const varCarteraP  = totalActual - totalAyer;
+    const varPct       = totalAyer !== 0 ? (varCarteraP / Math.abs(totalAyer)) * 100 : 0;
+    const varNavP      = nav - navAyer;
+
+    // Tarjetas
+    document.getElementById('totalCartera').textContent = '$ ' + fmtARS(totalActual, 2);
+    document.getElementById('nav').textContent          = '$ ' + fmtARS(nav, 4);
+
+    const viEl = document.getElementById('varInicio');
+    viEl.textContent = fmtPct(varInicioPct * 100);
+    viEl.className   = 'card-value ' + color(varInicioPct);
+
+    const vcEl = document.getElementById('varCarteraPct');
+    vcEl.textContent = fmtPct(varPct);
+    vcEl.className   = 'card-value ' + color(varPct);
+    document.getElementById('varCarteraPesos').textContent = fmtDelta(varCarteraP) + ' vs. valorizada ayer';
+
+    const vnEl = document.getElementById('varNavPct');
+    vnEl.textContent = fmtPct(varPct);
+    vnEl.className   = 'card-value ' + color(varPct);
+    document.getElementById('varNavPesos').textContent = fmtDelta(varNavP) + ' vs. valorizada ayer';
+
+    // Actualizar celdas calculadas en la tabla
+    const rows = document.querySelectorAll('#tableBody tr:not(.section-header)');
+    let ri = 0;
+    activos.forEach(activo => {
+        const row = rows[ri++];
+        if (!row) return;
+        const mActual   = monto(activo, 'precioActual');
+        const mAyer     = monto(activo, 'precioAyer');
+        const varDiaP   = mActual - mAyer;
+        const varDiaPct = mAyer !== 0 ? (varDiaP / Math.abs(mAyer)) * 100 : 0;
+        const varIni    = activo.precioInicial !== 0 ? (activo.precioActual / activo.precioInicial - 1) * 100 : 0;
+        const pct       = totalActual !== 0 ? (mActual / totalActual) * 100 : 0;
+
+        row.querySelector('[data-field="monto"]').textContent    = fmtARS(mActual, 0);
+        row.querySelector('[data-field="monto"]').className      = color(mActual);
+        row.querySelector('[data-field="varP"]').textContent     = fmtDelta(varDiaP);
+        row.querySelector('[data-field="varP"]').className       = color(varDiaP);
+        row.querySelector('[data-field="varDiaPct"]').textContent = fmtPct(varDiaPct);
+        row.querySelector('[data-field="varDiaPct"]').className  = color(varDiaPct);
+        row.querySelector('[data-field="varInicio"]').textContent = fmtPct(varIni);
+        row.querySelector('[data-field="varInicio"]').className  = color(varIni);
+        row.querySelector('[data-field="pct"]').textContent      = pct.toFixed(1) + '%';
+    });
+
+    document.getElementById('updateTime').textContent =
+        new Date().toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'medium' });
+}
+
+// ================================================================
+// MODAL — ABRIR / CERRAR
+// ================================================================
+function abrirModal() {
+    poblarEditTable();
+    document.getElementById('modalOverlay').classList.add('active');
+    document.getElementById('csvStatus').className = '';
+    document.getElementById('csvStatus').textContent = '';
+}
+function cerrarModal() {
+    document.getElementById('modalOverlay').classList.remove('active');
+}
+// Cerrar con clic fuera del modal
+document.getElementById('modalOverlay').addEventListener('click', e => {
+    if (e.target === document.getElementById('modalOverlay')) cerrarModal();
+});
+
+// ================================================================
+// MODAL — POBLAR TABLA DE EDICIÓN
+// ================================================================
+function poblarEditTable() {
+    const tbody = document.getElementById('editBody');
+    tbody.innerHTML = '';
+    activos.forEach((a, i) => agregarFilaModal(a, i));
+}
+
+function seccionOptions(selected) {
+    const all = [...new Set([...SECCIONES, selected])]; // incluye cualquier sección custom
+    return all.map(s => `<option value="${s}" ${s === selected ? 'selected' : ''}>${s}</option>`).join('');
+}
+function monedaOptions(selected) {
+    return MONEDAS.map(m => `<option value="${m}" ${m === selected ? 'selected' : ''}>${m}</option>`).join('');
+}
+function tipoOptions(selected) {
+    return ['bono','efectivo'].map(t => `<option value="${t}" ${t === selected ? 'selected' : ''}>${t}</option>`).join('');
+}
+
+function agregarFilaModal(a = null, insertIdx = null) {
+    const tbody = document.getElementById('editBody');
+    const defaults = a || { seccion: SECCIONES[0], nombre: '', moneda: 'Pesos', tipo: 'bono', nominales: 0, precioInicial: 0, precioAyer: 0, precioActual: 0 };
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+        <td><select class="edit-input">${seccionOptions(defaults.seccion)}</select></td>
+        <td><input  class="edit-input" type="text"   value="${defaults.nombre}"          placeholder="Ej: AL30"></td>
+        <td><select class="edit-input">${monedaOptions(defaults.moneda)}</select></td>
+        <td><select class="edit-input">${tipoOptions(defaults.tipo)}</select></td>
+        <td><input  class="edit-input" type="number" value="${defaults.nominales}"        step="any"></td>
+        <td><input  class="edit-input" type="number" value="${defaults.precioInicial}"    step="any"></td>
+        <td><input  class="edit-input" type="number" value="${defaults.precioAyer}"       step="any"></td>
+        <td><input  class="edit-input" type="number" value="${defaults.precioActual}"     step="any"></td>
+        <td><button class="btn btn-danger" onclick="eliminarFilaModal(this)" title="Eliminar">✕</button></td>
+    `;
+    tbody.appendChild(tr);
+}
+
+function agregarFila() { agregarFilaModal(); }
+
+function eliminarFilaModal(btn) {
+    btn.closest('tr').remove();
+}
+
+// ================================================================
+// MODAL — GUARDAR CAMBIOS
+// ================================================================
+function guardarCambios() {
+    const rows = document.querySelectorAll('#editBody tr');
+    const nuevos = [];
+    let hayError = false;
+
+    rows.forEach((tr, i) => {
+        const cols = tr.querySelectorAll('input, select');
+        const nombre = cols[1].value.trim();
+        if (!nombre) { hayError = true; cols[1].style.borderColor = '#f85149'; return; }
+        cols[1].style.borderColor = '';
+
+        nuevos.push({
+            seccion:       cols[0].value,
+            nombre:        nombre,
+            moneda:        cols[2].value,
+            tipo:          cols[3].value,
+            nominales:     parseFloat(cols[4].value) || 0,
+            precioInicial: parseFloat(cols[5].value) || 0,
+            precioAyer:    parseFloat(cols[6].value) || 0,
+            precioActual:  parseFloat(cols[7].value) || 0,
+        });
+    });
+
+    if (hayError) { alert('Completá el nombre de todos los activos.'); return; }
+
+    activos = nuevos;
+    renderTabla();
+    cerrarModal();
+}
+
+// ================================================================
+// CSV — DESCARGAR PLANTILLA
+// ================================================================
+function descargarCSV() {
+    const header = 'seccion,nombre,moneda,tipo,nominales,precioInicial,precioAyer,precioActual';
+    const filas  = activos.map(a =>
+        [a.seccion, a.nombre, a.moneda, a.tipo, a.nominales, a.precioInicial, a.precioAyer, a.precioActual].join(',')
+    );
+    const csv  = [header, ...filas].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url  = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href     = url;
+    link.download = 'cartera.csv';
+    link.click();
+    URL.revokeObjectURL(url);
+}
+
+// ================================================================
+// CSV — IMPORTAR
+// ================================================================
+function importarCSV(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = e => {
+        const status = document.getElementById('csvStatus');
+        try {
+            const lines = e.target.result.split('\n').map(l => l.trim()).filter(l => l);
+            // Omitir header
+            const filas = lines.slice(1);
+            if (filas.length === 0) throw new Error('El archivo está vacío.');
+
+            const importados = filas.map((line, i) => {
+                const cols = line.split(',');
+                if (cols.length < 8) throw new Error(`Fila ${i + 2}: faltan columnas.`);
+                return {
+                    seccion:       cols[0].trim(),
+                    nombre:        cols[1].trim(),
+                    moneda:        cols[2].trim(),
+                    tipo:          cols[3].trim(),
+                    nominales:     parseFloat(cols[4]) || 0,
+                    precioInicial: parseFloat(cols[5]) || 0,
+                    precioAyer:    parseFloat(cols[6]) || 0,
+                    precioActual:  parseFloat(cols[7]) || 0,
+                };
+            });
+
+            // Cargar en la tabla de edición (no guarda aún, el usuario debe confirmar)
+            const tbody = document.getElementById('editBody');
+            tbody.innerHTML = '';
+            importados.forEach(a => agregarFilaModal(a));
+
+            status.className = 'ok';
+            status.textContent = `✔ ${importados.length} activos importados. Revisá y presioná "Guardar cambios".`;
+        } catch (err) {
+            status.className = 'error';
+            status.textContent = '✕ Error al importar: ' + err.message;
+        }
+        event.target.value = ''; // reset input
+    };
+    reader.readAsText(file);
+}
+
+// ================================================================
+// INICIAR
+// ================================================================
+renderTabla();
+</script>
 
 </body>
 </html>
