@@ -204,7 +204,8 @@
         <h2>Composición de la Cartera</h2>
         <div class="toolbar-btns">
             <button class="btn btn-blue" onclick="abrirModal()">✏️ Modificar Cartera</button>
-            <button class="btn btn-green" onclick="recalcular()">↻ Recalcular</button>
+            <button class="btn btn-green" id="btnApi" onclick="actualizarPrecios()">🔄 Actualizar precios</button>
+            <button class="btn btn-ghost" onclick="recalcular()">↻ Recalcular</button>
         </div>
     </div>
     <div class="scroll-x">
@@ -616,6 +617,106 @@ function importarCSV(event) {
         event.target.value = ''; // reset input
     };
     reader.readAsText(file);
+}
+
+// ================================================================
+// ACTUALIZAR PRECIOS VÍA API
+// ================================================================
+
+// Mapa: nombre del activo → símbolo en la API (si difiere)
+// Si el nombre es igual al símbolo de la API, no hace falta listarlo
+const API_SYMBOL_MAP = {
+    // Los demás usan directamente el campo `nombre`
+};
+
+async function actualizarPrecios() {
+    const btn = document.getElementById('btnApi');
+    btn.textContent = '⏳ Conectando...';
+    btn.disabled = true;
+
+    try {
+        // Fetch en paralelo
+        const [bondsRes, notesRes, mepRes] = await Promise.all([
+            fetch('https://data912.com/live/arg_bonds'),
+            fetch('https://data912.com/live/arg_notes'),
+            fetch('https://data912.com/live/mep').catch(() => null),
+        ]);
+
+        const bonds = await bondsRes.json();
+        const notes = await notesRes.json();
+
+        // Lookup { SYMBOL: { actual, ayer } }
+        const precios = {};
+        [...bonds, ...notes].forEach(item => {
+            const actual = item.c;
+            const ayer   = item.pct_change !== 0
+                ? actual / (1 + item.pct_change / 100)
+                : actual;
+            precios[item.symbol] = { actual, ayer };
+        });
+
+        // MEP: buscar el tipo de cambio ARS/USD
+        if (mepRes && mepRes.ok) {
+            try {
+                const mepData = await mepRes.json();
+                const ref = mepData.find(m =>
+                    m.symbol === 'AL30' || m.symbol === 'GD30' || m.symbol === 'AL35'
+                );
+                if (ref) {
+                    const actual = ref.mep ?? ref.tc ?? ref.price ?? ref.c;
+                    const ayer   = (actual && ref.pct_change !== 0)
+                        ? actual / (1 + ref.pct_change / 100)
+                        : actual;
+                    if (actual) precios['__MEP__'] = { actual, ayer };
+                }
+            } catch(e) { /* MEP falló, saltear */ }
+        }
+
+        // Aplicar precios a los activos
+        let actualizados = 0;
+        let noEncontrados = [];
+
+        activos.forEach(a => {
+            // Activos de precio fijo (cash/honorarios): no actualizar
+            if (a.precioInicial === 1 || a.precioInicial === -1) return;
+
+            const symbol = API_SYMBOL_MAP[a.nombre] ?? a.nombre;
+
+            // MM USD usa el tipo de cambio MEP
+            if (a.nombre === 'MM USD') {
+                if (precios['__MEP__']) {
+                    a.precioActual = precios['__MEP__'].actual;
+                    a.precioAyer   = precios['__MEP__'].ayer;
+                    actualizados++;
+                } else {
+                    noEncontrados.push(a.nombre + ' (MEP)');
+                }
+                return;
+            }
+
+            if (symbol in precios) {
+                a.precioActual = precios[symbol].actual;
+                a.precioAyer   = precios[symbol].ayer;
+                actualizados++;
+            } else {
+                noEncontrados.push(a.nombre);
+            }
+        });
+
+        renderTabla();
+
+        const msg = noEncontrados.length
+            ? `✔ ${actualizados} actualizados · Sin precio: ${noEncontrados.join(', ')}`
+            : `✔ ${actualizados} precios actualizados`;
+
+        btn.textContent = msg;
+        setTimeout(() => { btn.textContent = '🔄 Actualizar precios'; btn.disabled = false; }, 5000);
+
+    } catch (err) {
+        console.error('Error API:', err);
+        btn.textContent = '✕ Error de conexión';
+        setTimeout(() => { btn.textContent = '🔄 Actualizar precios'; btn.disabled = false; }, 4000);
+    }
 }
 
 // ================================================================
