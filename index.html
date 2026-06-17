@@ -551,6 +551,7 @@ function guardarCambios() {
     if (hayError) { alert('Completá el nombre de todos los activos.'); return; }
 
     activos = nuevos;
+    guardarEnLocal();
     renderTabla();
     cerrarModal();
 }
@@ -703,6 +704,7 @@ async function actualizarPrecios() {
             }
         });
 
+        guardarEnLocal();
         renderTabla();
 
         const msg = noEncontrados.length
@@ -720,8 +722,25 @@ async function actualizarPrecios() {
 }
 
 // ================================================================
+// PERSISTENCIA LOCAL
+// ================================================================
+function guardarEnLocal() {
+    localStorage.setItem('cartera_activos', JSON.stringify(activos));
+}
+
+function cargarDesdeLocal() {
+    const guardado = localStorage.getItem('cartera_activos');
+    if (guardado) {
+        try {
+            activos = JSON.parse(guardado);
+        } catch(e) { /* datos corruptos, usar defaults */ }
+    }
+}
+
+// ================================================================
 // INICIAR
 // ================================================================
+cargarDesdeLocal();
 renderTabla();
 </script>
 
