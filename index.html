@@ -763,17 +763,35 @@ async function actualizarPrecios() {
         if (mepRes && mepRes.ok) {
             try {
                 const mepData = await mepRes.json();
-                const ref = mepData.find(m =>
-                    m.symbol === 'AL30' || m.symbol === 'GD30' || m.symbol === 'AL35'
-                );
+                console.log('MEP raw response:', JSON.stringify(mepData).substring(0, 500));
+
+                // La API puede devolver array u objeto
+                const items = Array.isArray(mepData) ? mepData : Object.values(mepData);
+
+                // Buscar por distintos nombres de símbolo que usan bonos con pata MEP
+                const ref = items.find(m => {
+                    const s = (m.symbol || m.ticker || m.name || '').toString().toUpperCase();
+                    return s.includes('AL30') || s.includes('GD30') || s.includes('AL35') || s.includes('GD35');
+                }) || items[0]; // si no hay match por símbolo, tomar el primero
+
                 if (ref) {
-                    const actual = ref.mep ?? ref.tc ?? ref.price ?? ref.c;
-                    const ayer   = (actual && ref.pct_change !== 0)
-                        ? actual / (1 + ref.pct_change / 100)
+                    console.log('MEP ref encontrado:', JSON.stringify(ref));
+                    // Intentar distintos nombres de campo para el tipo de cambio
+                    const actual = ref.mep ?? ref.mep_c ?? ref.tc ?? ref.price ?? ref.c ?? ref.last ?? ref.close ?? ref.value ?? ref.rate;
+                    const pct = ref.pct_change ?? ref.pct ?? ref.change_pct ?? 0;
+                    const ayer = (actual && pct !== 0)
+                        ? actual / (1 + pct / 100)
                         : actual;
-                    if (actual) precios['__MEP__'] = { actual, ayer };
+                    if (actual) {
+                        precios['__MEP__'] = { actual, ayer };
+                        console.log('MEP guardado:', actual, '| ayer:', ayer);
+                    } else {
+                        console.warn('MEP: no se encontró campo de precio. Campos disponibles:', Object.keys(ref).join(', '));
+                    }
                 }
-            } catch(e) { /* MEP falló, saltear */ }
+            } catch(e) {
+                console.warn('MEP fetch error:', e);
+            }
         }
 
         // Aplicar precios a los activos
